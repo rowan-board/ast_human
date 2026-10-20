@@ -1,0 +1,43 @@
+# Virtual environment
+.venv/
+env/
+
+# Data files
+data/
+*.csv
+*.tsv
+*.h5
+*.hdf5
+*.nc
+*.npy
+*.npz
+*.pkl
+*.pickle
+
+# Model fits and outputs
+model_fits/
+*.stan
+*.rds
+*.mat
+
+# Figures
+figures/
+*.png
+*.pdf
+*.svg
+*.eps
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Editor/OS clutter
+.DS_Store
+.vscode/settings.json
+*.swp
+*~
+
+# Logs
+*.log
