@@ -6,7 +6,7 @@ import scripts.helper_functions as func
 
 # read data
 # what data set are we analysing
-dataset = 'patient'
+dataset = 'exp1'
 clean_path = '~/code/ast_human/data/clean/' + dataset + '/'
 data = pd.read_csv(clean_path + 'clean_data.csv')
 
@@ -20,23 +20,44 @@ MAX_CONCURRENT = 3          # models running at once; extras queue up
 
 STAN_DIR = os.path.join(BASE_DIR, "scripts/models/stan/safrl")
 CSV_ROOT = "/mnt/bigdrive/AST_fits/stan_csv"
-FIT_DIR  = os.path.join(BASE_DIR, "model_fits/patient/safrl/stan")
+FIT_DIR  = os.path.join(BASE_DIR, "model_fits/" + dataset + "/safrl/stan")
+COMP_DIR = os.path.join(BASE_DIR, "model_fits/compiled")
 
 # (name, stan file, data, seed)
 jobs = [
-    ("safrl",                 "safrl_cT.stan",                data_dict, 999),
-    ("safrlC counterfactual", "safrlC_cT.stan",               data_dict, 999),
-    ("safrlC alphaC",         "safrlC_alphaC_cT.stan",        data_dict, 999),
+    ("safrlC",                 "safrlC.stan",                 data_dict, 999),
+    ("safrlD cT",              "safrlD_cT.stan",              data_dict, 999),
+    ("safrlD decay cT",        "safrlD_decay_cT.stan",        data_dict, 999),
 ]
 
 n_running = min(MAX_CONCURRENT, len(jobs))
 threads_per_chain = max(1, CORE_BUDGET // (n_running * CHAINS))
 print(f"{n_running} models at once, {CHAINS} chains x {threads_per_chain} threads each")
 
-# compile everything up front, one at a time
-models = {name: cmd.CmdStanModel(stan_file=os.path.join(STAN_DIR, f),
+print(f"COMP_DIR: {COMP_DIR}")
+for name, f, _, _ in jobs:
+    exe_path = os.path.join(COMP_DIR, f.replace('.stan', ''))
+    print(f"{name}: {exe_path} exists={os.path.exists(exe_path)}")
+
+import shutil
+
+models = {}
+for name, f, _, _ in jobs:
+    stan_path = os.path.join(STAN_DIR, f)
+    exe_path = os.path.join(COMP_DIR, f.replace('.stan', ''))
+    
+    if os.path.exists(exe_path):
+        model = cmd.CmdStanModel(stan_file=stan_path, exe_file=exe_path)
+    else:
+        # compile (saves next to .stan file)
+        model = cmd.CmdStanModel(stan_file=stan_path,
                                  cpp_options={"STAN_THREADS": True})
-          for name, f, _, _ in jobs}
+        src = stan_path.replace('.stan', '')
+        shutil.move(src, exe_path)
+        # reload from the new location
+        model = cmd.CmdStanModel(stan_file=stan_path, exe_file=exe_path)
+    
+    models[name] = model
 
 def run(name, data, seed):
     csv_dir = os.path.join(CSV_ROOT, name)
